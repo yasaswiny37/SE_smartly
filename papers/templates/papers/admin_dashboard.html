@@ -1,0 +1,403 @@
+{% extends 'papers/base.html' %}
+{% block title %}Admin Dashboard — Smart Conference Assistant{% endblock %}
+{% block nav_dash %}active{% endblock %}
+
+{% block content %}
+<main>
+<div class="dash">
+<div class="container">
+
+  <div class="alert alert-ok hidden" id="alertOk" role="status">
+    <span id="alertOkText">Operation completed successfully.</span>
+  </div>
+  <div class="alert alert-err hidden" id="alertErr" role="alert">
+    <span id="alertErrText">An error occurred. Please try again.</span>
+  </div>
+
+  <!-- Top bar -->
+  <div class="dash-topbar">
+    <div>
+      <div class="dash-topbar__breadcrumb">
+        SmartConf &rsaquo; <span>Admin Dashboard</span>
+      </div>
+      <h1 class="dash-topbar__title">Paper Database</h1>
+    </div>
+    <div class="dash-topbar__right">
+      <div class="dash-user">
+        <strong>{{ admin_username }}</strong>
+        {{ full_name }}
+      </div>
+      <a href="{% url 'index' %}" class="btn btn-outline" style="font-size:0.78rem;padding:8px 16px;">
+        &#8592; Search
+      </a>
+      <a href="{% url 'logout' %}" class="btn btn-primary" style="font-size:0.78rem;padding:8px 16px;">
+        Sign Out
+      </a>
+    </div>
+  </div>
+
+  <div class="dash-divider"></div>
+
+  <!-- Stats -->
+  <div class="stats-row" role="list">
+    <div class="stat-card" role="listitem">
+      <div class="stat-card__val" id="statTotal">{{ total_papers }}</div>
+      <div class="stat-card__label">Total Papers</div>
+    </div>
+    <div class="stat-card" role="listitem">
+      <div class="stat-card__val" id="statConfs">{{ total_conferences }}</div>
+      <div class="stat-card__label">Conferences</div>
+    </div>
+    <div class="stat-card" role="listitem">
+      <div class="stat-card__val" id="statIndexed">{{ indexed_papers }}</div>
+      <div class="stat-card__label">Indexed</div>
+    </div>
+  </div>
+
+  <!-- Panels -->
+  <div class="panels-grid">
+
+    <!-- Panel A: File Upload -->
+    <div class="panel">
+      <div class="panel__head">
+        <div class="panel__head-icon" aria-hidden="true">&#128196;</div>
+        <div>
+          <div class="panel__head-title">Bulk Upload</div>
+          <div class="panel__head-sub">CSV &middot; JSON &middot; BibTeX</div>
+        </div>
+      </div>
+      <div class="panel__body">
+        <div class="dropzone" id="dropZone" role="button" tabindex="0" aria-label="Click or drag file to upload">
+          <input type="file" id="fileInput" name="file" accept=".csv,.json,.bib,.bibtex" aria-label="Select file" />
+          <span class="dropzone__icon" aria-hidden="true">&#8679;</span>
+          <p class="dropzone__label"><strong>Click to browse</strong> or drag &amp; drop</p>
+          <p class="dropzone__hint">CSV &nbsp;&middot;&nbsp; JSON &nbsp;&middot;&nbsp; .bib &nbsp;&middot;&nbsp; Max 10 MB</p>
+        </div>
+        <div class="file-chip hidden" id="fileChip">
+          <span aria-hidden="true">&#128196;</span>
+          <span class="file-chip__name" id="chipName">filename.csv</span>
+          <button type="button" class="file-chip__rm" id="chipRm" aria-label="Remove file">&#xd7;</button>
+        </div>
+        <span class="field__error hidden" id="uploadErr" role="alert" style="margin-top:8px;display:block;"></span>
+        <button type="button" class="btn btn-primary btn-full" id="uploadBtn" style="margin-top:16px;" disabled>
+          Upload &amp; Import
+        </button>
+      </div>
+    </div>
+
+    <!-- Panel B: Manual Entry -->
+    <div class="panel">
+      <div class="panel__head">
+        <div class="panel__head-icon" aria-hidden="true">&#9998;</div>
+        <div>
+          <div class="panel__head-title">Manual Entry</div>
+          <div class="panel__head-sub">Add a single paper</div>
+        </div>
+      </div>
+      <div class="panel__body">
+        <form id="manualForm" novalidate>
+          {% csrf_token %}
+          <div class="field">
+            <label class="field__label" for="pTitle">Paper Title</label>
+            <input class="field__input" type="text" id="pTitle" name="title"
+              placeholder="Attention Is All You Need" maxlength="500"
+              required aria-describedby="pTitle-err" />
+            <span class="field__error hidden" id="pTitle-err" role="alert"></span>
+          </div>
+          <div class="field">
+            <label class="field__label" for="pAuthors">Authors</label>
+            <input class="field__input" type="text" id="pAuthors" name="authors"
+              placeholder="A. Vaswani, N. Shazeer, N. Parmar" maxlength="500"
+              required aria-describedby="pAuthors-err" />
+            <span class="field__error hidden" id="pAuthors-err" role="alert"></span>
+          </div>
+          <div class="field">
+            <label class="field__label" for="pAbstract">Abstract</label>
+            <textarea class="field__textarea" id="pAbstract" name="abstract"
+              placeholder="We propose a model architecture based on attention mechanisms…"
+              rows="4" maxlength="5000" required aria-describedby="pAbstract-err"></textarea>
+            <span class="field__error hidden" id="pAbstract-err" role="alert"></span>
+          </div>
+          <div class="two-col">
+            <div class="field" style="margin-bottom:0;">
+              <label class="field__label" for="pConf">Conference</label>
+              <select class="field__input field__select" id="pConf" name="conference"
+                required aria-describedby="pConf-err">
+                <option value="">Select…</option>
+                {% for conf in request.session.conferences|default:"" %}
+                  <option value="{{ conf }}">{{ conf }}</option>
+                {% endfor %}
+                <option value="NeurIPS">NeurIPS</option>
+                <option value="ICML">ICML</option>
+                <option value="ICLR">ICLR</option>
+                <option value="CVPR">CVPR</option>
+                <option value="ACL">ACL</option>
+                <option value="EMNLP">EMNLP</option>
+                <option value="AAAI">AAAI</option>
+                <option value="KDD">KDD</option>
+                <option value="IEEE">IEEE</option>
+                <option value="Other">Other</option>
+              </select>
+              <span class="field__error hidden" id="pConf-err" role="alert"></span>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label class="field__label" for="pYear">Year</label>
+              <input class="field__input" type="number" id="pYear" name="year"
+                placeholder="2024" min="1990" max="2030"
+                required aria-describedby="pYear-err" />
+              <span class="field__error hidden" id="pYear-err" role="alert"></span>
+            </div>
+          </div>
+          <div class="field" style="margin-top:14px;">
+            <label class="field__label" for="pDOI">
+              DOI / URL
+              <span style="font-weight:400;text-transform:none;font-size:0.6rem;color:var(--ink-30);">optional</span>
+            </label>
+            <input class="field__input" type="url" id="pDOI" name="doi_url"
+              placeholder="https://doi.org/10.xxxx/…" />
+          </div>
+          <button type="submit" class="btn btn-gold btn-full" id="addBtn" style="margin-top:4px;">
+            Add Paper
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- /panels-grid -->
+
+  <!-- Recent papers table -->
+  <div class="table-panel">
+    <div class="table-panel__head">
+      <span class="table-panel__title">Recently Added</span>
+      <span class="table-panel__count" id="tableCount">Showing {{ recent_papers|length }} papers</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" aria-label="Recently added papers">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Conference</th>
+            <th>Year</th>
+            <th>Indexed</th>
+            <th>Added</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="papersTbody">
+          {% for paper in recent_papers %}
+          <tr id="row-{{ paper.id }}">
+            <td class="title-cell">{{ paper.title }}</td>
+            <td><span class="tag tag-conf">{{ paper.conference.name }}</span></td>
+            <td style="font-family:var(--mono);font-size:0.78rem;color:var(--ink-60);">{{ paper.year }}</td>
+            <td>
+              {% if paper.indexed %}
+                <span style="color:var(--success);font-family:var(--mono);font-size:0.62rem;">&#10003; Yes</span>
+              {% else %}
+                <span style="color:var(--ink-30);font-family:var(--mono);font-size:0.62rem;">Pending</span>
+              {% endif %}
+            </td>
+            <td style="font-family:var(--mono);font-size:0.7rem;color:var(--ink-30);">{{ paper.added_at|date:"d M Y" }}</td>
+            <td>
+              <button class="del-btn" type="button" data-paper-id="{{ paper.id }}" data-paper-title="{{ paper.title|escape }}">
+                Delete
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr id="emptyRow">
+            <td colspan="6" style="text-align:center;color:var(--ink-30);font-style:italic;padding:32px;">
+              No papers yet. Upload a CSV or add one manually above.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+</main>
+{% endblock %}
+
+{% block footer_copy %}© 2025 Smart Conference Assistant &nbsp;&middot;&nbsp; Admin dashboard{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function showAlert(type, msg) {
+  const ok  = document.getElementById('alertOk');
+  const err = document.getElementById('alertErr');
+  ok.classList.add('hidden'); err.classList.add('hidden');
+  if (type === 'ok') {
+    document.getElementById('alertOkText').textContent = msg;
+    ok.classList.remove('hidden');
+    setTimeout(() => ok.classList.add('hidden'), 5000);
+  } else {
+    document.getElementById('alertErrText').textContent = msg;
+    err.classList.remove('hidden');
+    setTimeout(() => err.classList.add('hidden'), 7000);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function refreshStats() {
+  try {
+    const res  = await fetch('/api/stats/');
+    const data = await res.json();
+    document.getElementById('statTotal').textContent   = data.total_papers;
+    document.getElementById('statConfs').textContent   = data.total_conferences;
+    document.getElementById('statIndexed').textContent = data.indexed_papers;
+  } catch(e) {}
+}
+
+async function refreshTable() {
+  try {
+    const res   = await fetch('/api/papers/');
+    const data  = await res.json();
+    const tbody = document.getElementById('papersTbody');
+    if (!data.papers.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--ink-30);font-style:italic;padding:32px;">No papers yet.</td></tr>`;
+      document.getElementById('tableCount').textContent = 'No papers';
+      return;
+    }
+    document.getElementById('tableCount').textContent = `Showing ${data.papers.length} papers`;
+    tbody.innerHTML = data.papers.map(p => `
+      <tr id="row-${p.id}">
+        <td class="title-cell">${p.title}</td>
+        <td><span class="tag tag-conf">${p.conference}</span></td>
+        <td style="font-family:var(--mono);font-size:0.78rem;color:var(--ink-60);">${p.year}</td>
+        <td><span style="color:${p.indexed ? 'var(--success)' : 'var(--ink-30)'};font-family:var(--mono);font-size:0.62rem;">${p.indexed ? '✓ Yes' : 'Pending'}</span></td>
+        <td style="font-family:var(--mono);font-size:0.7rem;color:var(--ink-30);">${p.added_at}</td>
+        <td><button class="del-btn" type="button" data-paper-id="${p.id}" data-paper-title="${p.title.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}">Delete</button></td>
+      </tr>`).join('');
+  } catch(e) {}
+}
+
+async function confirmDel(id, title) {
+  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/api/delete/${id}/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF }
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById(`row-${id}`)?.remove();
+      showAlert('ok', `"${title}" deleted successfully.`);
+      refreshStats();
+    } else {
+      showAlert('err', data.error || 'Delete failed.');
+    }
+  } catch(e) {
+    showAlert('err', 'Network error. Please try again.');
+  }
+}
+
+document.addEventListener('click', event => {
+  const btn = event.target.closest('button.del-btn');
+  if (!btn) return;
+  const id = btn.dataset.paperId;
+  const title = btn.dataset.paperTitle;
+  if (id && title) confirmDel(id, title);
+});
+
+/* ── File upload ── */
+const fileInput = document.getElementById('fileInput');
+const dropZone  = document.getElementById('dropZone');
+const fileChip  = document.getElementById('fileChip');
+const chipName  = document.getElementById('chipName');
+const uploadBtn = document.getElementById('uploadBtn');
+
+function setFile(file) {
+  if (!file) return;
+  chipName.textContent = file.name;
+  fileChip.classList.remove('hidden');
+  uploadBtn.disabled = false;
+  document.getElementById('uploadErr').classList.add('hidden');
+}
+
+fileInput.addEventListener('change', e => setFile(e.target.files[0]));
+document.getElementById('chipRm').addEventListener('click', () => {
+  fileInput.value = '';
+  fileChip.classList.add('hidden');
+  uploadBtn.disabled = true;
+});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if (file) { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; setFile(file); }
+});
+
+uploadBtn.addEventListener('click', async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  uploadBtn.textContent = 'Uploading…';
+  uploadBtn.disabled = true;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('csrfmiddlewaretoken', CSRF);
+  try {
+    const res  = await fetch('/api/upload/', { method: 'POST', body: fd });
+    const data = await res.json();
+    uploadBtn.textContent = 'Upload & Import';
+    if (data.error) {
+      showAlert('err', data.error);
+    } else {
+      const errs = data.errors?.length ? ` (${data.errors.length} skipped)` : '';
+      showAlert('ok', `Imported ${data.saved} papers${errs}.`);
+      fileInput.value = '';
+      fileChip.classList.add('hidden');
+      refreshStats();
+      refreshTable();
+    }
+  } catch(e) {
+    uploadBtn.textContent = 'Upload & Import';
+    showAlert('err', 'Upload failed. Please try again.');
+  }
+});
+
+/* ── Manual form ── */
+document.getElementById('manualForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fields = ['pTitle','pAuthors','pAbstract','pConf','pYear'];
+  const ids    = ['pTitle-err','pAuthors-err','pAbstract-err','pConf-err','pYear-err'];
+  let valid = true;
+  fields.forEach((f,i) => {
+    const el  = document.getElementById(f);
+    const err = document.getElementById(ids[i]);
+    el.classList.remove('err'); err.classList.add('hidden'); err.textContent = '';
+    if (!el.value.trim()) {
+      el.classList.add('err'); err.textContent = 'This field is required.';
+      err.classList.remove('hidden'); valid = false;
+    }
+  });
+  if (!valid) return;
+
+  const btn = document.getElementById('addBtn');
+  btn.textContent = 'Adding…'; btn.disabled = true;
+
+  const fd = new FormData(e.target);
+  try {
+    const res  = await fetch('/api/add-paper/', { method: 'POST', body: fd });
+    const data = await res.json();
+    btn.textContent = 'Add Paper'; btn.disabled = false;
+    if (data.errors?.length) {
+      showAlert('err', data.errors[0]);
+    } else {
+      showAlert('ok', 'Paper added and indexed successfully.');
+      e.target.reset();
+      refreshStats();
+      refreshTable();
+    }
+  } catch(err) {
+    btn.textContent = 'Add Paper'; btn.disabled = false;
+    showAlert('err', 'Network error. Please try again.');
+  }
+});
+</script>
+{% endblock %}

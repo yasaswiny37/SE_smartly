@@ -1,0 +1,114 @@
+{% extends 'papers/base.html' %}
+{% block title %}Admin Login — Smart Conference Assistant{% endblock %}
+{% block nav_login %}active{% endblock %}
+
+{% block content %}
+<main>
+  <div class="login-wrap" role="main">
+    <div class="login-card">
+      <div class="login-card__logo">
+        <div class="login-card__logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="4"   width="11" height="1.5" rx="0.75" fill="#FFCC00"/>
+            <rect x="2" y="7.5" width="8"  height="1.5" rx="0.75" fill="#FFCC00"/>
+            <rect x="2" y="11"  width="11" height="1.5" rx="0.75" fill="#FFCC00"/>
+            <circle cx="15" cy="14" r="3" stroke="#FFCC00" stroke-width="1.5"/>
+            <path d="M17.2 16.2l1.8 1.8" stroke="#FFCC00" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="login-card__logo-text">Smart<span>Conf</span></span>
+      </div>
+
+      <h1 class="login-card__title" id="login-title">Admin Sign In</h1>
+      <p class="login-card__sub">Restricted to authorised administrators only.</p>
+
+      {% if error %}
+      <div class="alert alert-err" role="alert">
+        <span>{{ error_msg|default:"Invalid username or password. Please try again." }}</span>
+      </div>
+      {% endif %}
+
+      <form id="loginForm" method="POST" action="{% url 'login' %}" novalidate>
+        {% csrf_token %}
+
+        <div class="field">
+          <label class="field__label" for="username">Username</label>
+          <input class="field__input" type="text" id="username" name="username"
+            placeholder="your.username" autocomplete="username"
+            required aria-describedby="username-err" />
+          <span class="field__error hidden" id="username-err" role="alert"></span>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password">
+            Password
+            <button type="button" class="pwd-show" id="pwdToggle">Show</button>
+          </label>
+          <input class="field__input" type="password" id="password" name="password"
+            placeholder="••••••••" autocomplete="current-password"
+            required aria-describedby="password-err" />
+          <span class="field__error hidden" id="password-err" role="alert"></span>
+        </div>
+
+        <div class="field" style="display:flex;align-items:center;gap:10px;">
+          <input type="checkbox" id="rememberMe" name="remember"
+            style="accent-color:var(--navy);width:15px;height:15px;cursor:pointer;flex-shrink:0;" />
+          <label for="rememberMe"
+            style="font-size:0.82rem;color:var(--ink-60);cursor:pointer;font-weight:300;margin:0;">
+            Keep me signed in
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="loginBtn" style="margin-top:8px;">
+          Sign In
+        </button>
+      </form>
+
+      <p style="text-align:center;margin-top:20px;font-size:0.76rem;color:var(--ink-30);">
+        Not an admin?
+        <a href="{% url 'index' %}"
+          style="color:var(--navy);font-weight:600;border-bottom:1px solid var(--navy-10);">
+          Return to search
+        </a>
+      </p>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block footer_copy %}© 2025 Smart Conference Assistant &nbsp;&middot;&nbsp; Admin access only{% endblock %}
+
+{% block extra_js %}
+<script>
+  const pwdToggle = document.getElementById('pwdToggle');
+  const pwdInput  = document.getElementById('password');
+  pwdToggle.addEventListener('click', () => {
+    const show = pwdInput.type === 'password';
+    pwdInput.type         = show ? 'text' : 'password';
+    pwdToggle.textContent = show ? 'Hide' : 'Show';
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', e => {
+    const u    = document.getElementById('username');
+    const p    = document.getElementById('password');
+    const uErr = document.getElementById('username-err');
+    const pErr = document.getElementById('password-err');
+    let valid  = true;
+    [u, p].forEach(el => el.classList.remove('err'));
+    [uErr, pErr].forEach(el => { el.textContent = ''; el.classList.add('hidden'); });
+    if (!u.value.trim()) {
+      u.classList.add('err'); uErr.textContent = 'Username is required.';
+      uErr.classList.remove('hidden'); valid = false;
+    }
+    if (!p.value) {
+      p.classList.add('err'); pErr.textContent = 'Password is required.';
+      pErr.classList.remove('hidden'); valid = false;
+    }
+    if (!valid) { e.preventDefault(); return; }
+    document.getElementById('loginBtn').textContent = 'Signing in…';
+    document.getElementById('loginBtn').disabled = true;
+  });
+
+  document.getElementById('username').focus();
+</script>
+{% endblock %}

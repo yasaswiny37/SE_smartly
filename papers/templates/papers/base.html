@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Smart Conference Assistant{% endblock %}</title>
+  <meta name="description" content="Semantic search engine for academic conference papers" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'papers/styles.css' %}" />
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── NAVIGATION ── -->
+<nav class="nav" role="navigation" aria-label="Main navigation">
+  <div class="nav__inner">
+    <a href="{% url 'index' %}" class="nav__brand" aria-label="SmartConf Home">
+      <div class="nav__brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="4"   width="11" height="1.5" rx="0.75" fill="#003366"/>
+          <rect x="2" y="7.5" width="8"  height="1.5" rx="0.75" fill="#003366"/>
+          <rect x="2" y="11"  width="11" height="1.5" rx="0.75" fill="#003366"/>
+          <circle cx="15" cy="14" r="3" stroke="#003366" stroke-width="1.5"/>
+          <path d="M17.2 16.2l1.8 1.8" stroke="#003366" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="nav__brand-name">Smart<span>Conf</span></span>
+    </a>
+
+    <button class="nav__burger" id="navBurger" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks">
+      <span></span><span></span><span></span>
+    </button>
+
+    <ul class="nav__links" id="navLinks" role="list">
+      <li><a href="{% url 'index' %}" class="{% block nav_home %}{% endblock %}">Home</a></li>
+      <li><a href="{% url 'index' %}#about">About</a></li>
+      {% if request.session.is_admin %}
+        <li><a href="{% url 'dashboard' %}" class="nav__cta {% block nav_dash %}{% endblock %}">Dashboard</a></li>
+        <li><a href="{% url 'logout' %}" style="color:rgba(255,255,255,0.5);font-size:0.78rem;">Sign Out</a></li>
+      {% else %}
+        <li><a href="{% url 'login' %}" class="nav__cta {% block nav_login %}{% endblock %}">Admin Login</a></li>
+      {% endif %}
+    </ul>
+  </div>
+</nav>
+
+{% block content %}{% endblock %}
+
+<!-- ── FOOTER ── -->
+<footer role="contentinfo">
+  <span class="footer__brand">Smart<span>Conf</span></span>
+  <span class="footer__copy">{% block footer_copy %}© 2025 Smart Conference Assistant &nbsp;&middot;&nbsp; Built for researchers{% endblock %}</span>
+</footer>
+
+<script>
+  const navBurger = document.getElementById('navBurger');
+  const navLinks  = document.getElementById('navLinks');
+  navBurger.addEventListener('click', () => {
+    const open = navLinks.classList.toggle('open');
+    navBurger.setAttribute('aria-expanded', open);
+  });
+  document.addEventListener('click', e => {
+    if (!navBurger.contains(e.target) && !navLinks.contains(e.target)) {
+      navLinks.classList.remove('open');
+      navBurger.setAttribute('aria-expanded', 'false');
+    }
+  });
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

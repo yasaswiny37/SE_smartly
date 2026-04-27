@@ -1,0 +1,208 @@
+{% extends 'papers/base.html' %}
+{% block title %}Smart Conference Assistant{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block content %}
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero__inner container">
+    <p class="hero__eyebrow">Semantic Paper Search</p>
+    <h1 class="hero__title" id="hero-title">
+      Discover research<br />that <em>truly resonates</em>
+    </h1>
+    <p class="hero__sub">
+      Describe any research topic in plain language. Our engine finds the most
+      relevant conference papers by meaning — not just keywords.
+    </p>
+
+    <div class="search-box" role="search">
+      <div class="search-box__row">
+        <span class="search-box__icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M14 14l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <input class="search-box__input" type="text" id="searchInput"
+          placeholder="Describe a topic you are looking for..."
+          autocomplete="off" aria-label="Search query" />
+        <button class="search-box__go" id="searchBtn" type="button">Search</button>
+      </div>
+      <div class="search-box__filters">
+        <select class="search-filter" id="filterConf" aria-label="Filter by conference">
+          <option value="">All Conferences</option>
+          {% for conf in conferences %}
+            <option value="{{ conf.name }}">{{ conf.name }}</option>
+          {% endfor %}
+        </select>
+        <select class="search-filter" id="filterMode" aria-label="Result mode">
+          <option value="ranked">Ranked (top-5)</option>
+          <option value="best_match">Best Match only</option>
+        </select>
+        <select class="search-filter" id="filterYear" aria-label="Filter by year">
+          <option value="">All Years</option>
+          {% for yr in years %}
+            <option value="{{ yr }}">{{ yr }}</option>
+          {% endfor %}
+        </select>
+        <button class="search-clear" id="clearBtn" type="button">Clear</button>
+      </div>
+    </div>
+
+    <div class="load-bar hidden" id="loadBar" aria-live="polite" aria-label="Searching">
+      <div class="load-bar__fill"></div>
+    </div>
+  </div>
+</section>
+
+<main>
+<section class="results-section" id="resultsSection" aria-labelledby="results-label">
+  <div class="container">
+
+    <!-- LLM Answer box -->
+    <div id="llmBox" class="hidden" style="margin-bottom:28px;padding:20px 24px;background:#fff;border:1px solid var(--ink-12);border-left:4px solid var(--gold);border-radius:var(--radius);">
+      <p style="font-family:var(--mono);font-size:0.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-30);margin-bottom:8px;">AI Summary</p>
+      <p id="llmText" style="font-size:0.9rem;line-height:1.75;color:var(--ink);font-weight:300;"></p>
+    </div>
+
+    <div class="results-bar">
+      <p class="results-count" id="results-label">
+        <strong id="resultNum">0</strong>
+        results for &ldquo;<span id="resultQuery"></span>&rdquo;
+      </p>
+    </div>
+
+    <div class="papers-list" id="papersList" role="list"></div>
+
+    <div class="empty-state hidden" id="emptyState" role="status">
+      <span class="empty-state__icon" aria-hidden="true">&#128270;</span>
+      <p class="empty-state__title">No papers found</p>
+      <p class="empty-state__sub">Try rephrasing your query or clearing the filters.</p>
+    </div>
+
+    <div class="empty-state hidden" id="initialState" role="status" style="border:none;">
+      <span class="empty-state__icon" aria-hidden="true">&#128221;</span>
+      <p class="empty-state__title">Search to discover papers</p>
+      <p class="empty-state__sub">Enter any research topic above to get started.</p>
+    </div>
+
+  </div>
+</section>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function buildCard(p, idx) {
+  const bestTag = p.is_best ? '<span class="tag tag-best">&#9733; Best Match</span>' : '';
+  const num = String(idx + 1).padStart(2, '0');
+  const bestClass = p.is_best ? ' best' : '';
+  return `
+    <article class="paper-card${bestClass}" role="listitem" data-id="${p.id}">
+      <span class="paper-card__num" aria-label="Rank ${idx+1}">${num}</span>
+      <div class="paper-card__body">
+        <div class="paper-card__tags">
+          <span class="tag tag-conf">${p.conference}</span>
+          <span class="tag tag-year">${p.year}</span>
+          ${bestTag}
+          <span class="tag" style="background:var(--smoke);color:var(--ink-60);border:1px solid var(--ink-12);">
+            ${Math.round(p.score * 100)}% match
+          </span>
+        </div>
+        <h2 class="paper-card__title">${p.title}</h2>
+        <p class="paper-card__authors">${p.authors}</p>
+        <p class="paper-card__abstract">${p.abstract}</p>
+        ${p.doi_url ? `<a href="${p.doi_url}" target="_blank" rel="noopener"
+          style="font-family:var(--mono);font-size:0.62rem;letter-spacing:.1em;color:var(--navy);text-transform:uppercase;">
+          View paper ↗</a>` : ''}
+        <div>
+          <button class="why-btn" type="button" aria-expanded="false"
+            onclick="toggleWhy(this)">
+            <span class="why-btn__arr" aria-hidden="true">&#9658;</span> Why this matches
+          </button>
+          <div class="why-body" style="display:none;">
+            ${p.why}
+          </div>
+        </div>
+      </div>
+    </article>`;
+}
+
+function toggleWhy(btn) {
+  const body = btn.nextElementSibling;
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  btn.classList.toggle('open', !open);
+  btn.setAttribute('aria-expanded', !open);
+}
+
+async function doSearch() {
+  const q    = document.getElementById('searchInput').value.trim();
+  if (!q) { document.getElementById('searchInput').focus(); return; }
+
+  const conf = document.getElementById('filterConf').value;
+  const year = document.getElementById('filterYear').value;
+  const mode = document.getElementById('filterMode').value;
+
+  document.getElementById('loadBar').classList.remove('hidden');
+  document.getElementById('papersList').innerHTML = '';
+  document.getElementById('emptyState').classList.add('hidden');
+  document.getElementById('initialState').classList.add('hidden');
+  document.getElementById('llmBox').classList.add('hidden');
+  document.getElementById('resultQuery').textContent = q;
+
+  const params = new URLSearchParams({ q, mode, conference: conf, year });
+  try {
+    const res  = await fetch(`/api/search/?${params}`);
+    const data = await res.json();
+
+    document.getElementById('loadBar').classList.add('hidden');
+
+    if (data.error) {
+      document.getElementById('emptyState').classList.remove('hidden');
+      return;
+    }
+
+    const papers = data.papers || [];
+    document.getElementById('resultNum').textContent = papers.length;
+
+    if (papers.length === 0) {
+      document.getElementById('emptyState').classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('papersList').innerHTML = papers.map(buildCard).join('');
+
+    if (data.llm_answer) {
+      document.getElementById('llmText').textContent = data.llm_answer;
+      document.getElementById('llmBox').classList.remove('hidden');
+    }
+  } catch (err) {
+    document.getElementById('loadBar').classList.add('hidden');
+    document.getElementById('emptyState').classList.remove('hidden');
+  }
+}
+
+document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterConf').value  = '';
+  document.getElementById('filterYear').value  = '';
+  document.getElementById('filterMode').value  = 'ranked';
+  document.getElementById('papersList').innerHTML = '';
+  document.getElementById('resultNum').textContent = '0';
+  document.getElementById('resultQuery').textContent = '';
+  document.getElementById('llmBox').classList.add('hidden');
+  document.getElementById('emptyState').classList.add('hidden');
+  document.getElementById('initialState').classList.remove('hidden');
+  document.getElementById('searchInput').focus();
+});
+
+document.getElementById('initialState').classList.remove('hidden');
+document.getElementById('searchInput').focus();
+</script>
+{% endblock %}
